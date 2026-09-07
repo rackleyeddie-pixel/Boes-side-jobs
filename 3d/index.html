@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
+<title>Boe's Side Jobs 3D</title>
+<style>
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#87bdea;font-family:system-ui,-apple-system,sans-serif;touch-action:none}#game{width:100%;height:100%;display:block}.hud{position:fixed;inset:0;pointer-events:none;color:#fff;text-shadow:0 2px 4px #000}.top{display:flex;justify-content:space-between;padding:14px;font-weight:900}.mission{position:absolute;top:54px;left:50%;transform:translateX(-50%);background:#0009;border:2px solid #fff6;border-radius:12px;padding:8px 12px;font-weight:800;white-space:nowrap}.controls{position:absolute;left:0;right:0;bottom:18px;display:flex;justify-content:space-between;align-items:flex-end;padding:0 18px;pointer-events:none}.pad,.actions{pointer-events:auto;display:grid;gap:10px}.pad{grid-template-columns:72px 72px}.actions{grid-template-columns:86px 86px}.btn{width:72px;height:72px;border-radius:50%;border:3px solid #fff9;background:#171717aa;color:white;font-weight:900;font-size:24px;box-shadow:0 5px 12px #0008}.actions .btn{width:86px;height:86px;font-size:15px}.work{background:#b67629dd}.jump{background:#2769b6dd}.badge{background:#0009;padding:6px 10px;border-radius:10px}.start{position:fixed;inset:0;display:grid;place-items:center;background:linear-gradient(#72b4ec,#d6ecff);z-index:5}.card{width:min(88vw,420px);background:#17130fee;color:#fff;border:3px solid #d6a85c;border-radius:18px;padding:22px;text-align:center;box-shadow:0 16px 50px #0006}.card h1{margin:0 0 8px;font-size:34px}.card p{line-height:1.35}.play{font:900 20px system-ui;padding:14px 26px;border:0;border-radius:12px;background:#d89b3b;color:#17100a}.hint{font-size:13px;opacity:.85}.toast{position:absolute;left:50%;top:120px;transform:translateX(-50%);background:#111d;padding:10px 14px;border-radius:10px;font-weight:800;display:none}
+</style>
+</head>
+<body>
+<div class="start" id="start"><div class="card"><h1>BOE'S SIDE JOBS 3D</h1><p>Level 1 prototype: run around the neighborhood, find the damaged fence, and repair all 5 sections.</p><button class="play" id="play">START JOB</button><p class="hint">Built as a separate 3D prototype. Your original 2D game is untouched.</p></div></div>
+<canvas id="game"></canvas>
+<div class="hud"><div class="top"><span class="badge">❤️❤️❤️</span><span class="badge">$250</span></div><div class="mission" id="mission">Fence repaired: 0 / 5</div><div class="toast" id="toast">Nice work!</div><div class="controls"><div class="pad"><button class="btn" id="left">◀</button><button class="btn" id="right">▶</button></div><div class="actions"><button class="btn work" id="work">WORK</button><button class="btn jump" id="jump">JUMP</button></div></div></div>
+<script src="https://cdn.babylonjs.com/babylon.js"></script>
+<script>
+(()=>{
+const canvas=document.getElementById('game'),engine=new BABYLON.Engine(canvas,true,{preserveDrawingBuffer:true,stencil:true});
+let scene,player,cam,velY=0,onGround=true,repair=0; const keys={left:false,right:false,forward:false,back:false};
+function mat(name,color){const m=new BABYLON.StandardMaterial(name,scene);m.diffuseColor=BABYLON.Color3.FromHexString(color);return m}
+function box(name,size,pos,material){const b=BABYLON.MeshBuilder.CreateBox(name,size,scene);b.position=pos;b.material=material;return b}
+function tree(x,z){const trunk=BABYLON.MeshBuilder.CreateCylinder('trunk',{height:3,diameter:.55},scene);trunk.position.set(x,1.5,z);trunk.material=mat('trunkM','#6b4428');const crown=BABYLON.MeshBuilder.CreateSphere('crown',{diameter:3.2,segments:8},scene);crown.position.set(x,3.8,z);crown.material=mat('leaf','#447f3b')}
+function house(x,z,c){const body=box('house',{width:6,height:3.8,depth:5},new BABYLON.Vector3(x,1.9,z),mat('houseM',c));const roof=BABYLON.MeshBuilder.CreateCylinder('roof',{diameter:7,height:5,tessellation:3},scene);roof.rotation.z=Math.PI/2;roof.position.set(x,4.2,z);roof.material=mat('roofM','#6d3427');const door=box('door',{width:1,height:2.2,depth:.15},new BABYLON.Vector3(x,1.1,z-2.58),mat('doorM','#5c3a25'))}
+function createPlayer(){player=new BABYLON.TransformNode('Boe',scene);const jeans=mat('jeans','#315a87'),shirt=mat('shirt','#d08b32'),skin=mat('skin','#d7a06b'),boot=mat('boot','#402b21');
+const torso=box('torso',{width:.9,height:1.4,depth:.48},new BABYLON.Vector3(0,1.9,0),shirt);torso.parent=player;const head=BABYLON.MeshBuilder.CreateSphere('head',{diameter:.7,segments:12},scene);head.position.set(0,2.95,0);head.material=skin;head.parent=player;
+for(const sx of [-.24,.24]){const leg=box('leg',{width:.25,height:1,depth:.28},new BABYLON.Vector3(sx,0.72,0),jeans);leg.parent=player;const bt=box('boot',{width:.3,height:.25,depth:.5},new BABYLON.Vector3(sx,.14,-.08),boot);bt.parent=player}
+for(const sx of [-.58,.58]){const arm=box('arm',{width:.22,height:1.15,depth:.25},new BABYLON.Vector3(sx,1.9,0),skin);arm.parent=player}
+player.position.set(-7,0,-2);}
+let fence=[];function makeFence(){const wood=mat('wood','#8b5a2b'),fixed=mat('fixed','#c8924e');for(let i=0;i<5;i++){const x=2+i*1.6;const post=box('post',{width:.22,height:2.2,depth:.22},new BABYLON.Vector3(x,1.1,2.2),wood);const rail=box('rail',{width:1.45,height:.18,depth:.18},new BABYLON.Vector3(x+.75,1.45,2.2),wood);const rail2=box('rail',{width:1.45,height:.18,depth:.18},new BABYLON.Vector3(x+.75,.75,2.2),wood);rail.rotation.z=(i%2?-.12:.1);rail2.rotation.z=(i%2?.08:-.08);fence.push({post,rail,rail2,fixed})}}
+function createScene(){scene=new BABYLON.Scene(engine);scene.clearColor=new BABYLON.Color4(.49,.72,.91,1);scene.collisionsEnabled=true;const hemi=new BABYLON.HemisphericLight('sky',new BABYLON.Vector3(0,1,0),scene);hemi.intensity=.75;const sun=new BABYLON.DirectionalLight('sun',new BABYLON.Vector3(-.5,-1,.35),scene);sun.position=new BABYLON.Vector3(20,30,-20);sun.intensity=1.1;
+const ground=BABYLON.MeshBuilder.CreateGround('ground',{width:60,height:45},scene);ground.material=mat('grass','#61964f');const road=box('road',{width:55,height:.08,depth:8},new BABYLON.Vector3(0,.04,-7),mat('roadM','#55585d'));for(let x=-25;x<26;x+=5)box('line',{width:2.5,height:.02,depth:.14},new BABYLON.Vector3(x,.09,-7),mat('lineM','#f2e5ab'));
+house(-11,8,'#d4b37d');house(0,10,'#9fb7c8');house(11,8,'#c98f7e');tree(-16,2);tree(-4,5);tree(14,3);tree(18,10);makeFence();createPlayer();
+cam=new BABYLON.ArcRotateCamera('cam',-Math.PI/2,1.05,9,new BABYLON.Vector3(0,1.5,0),scene);cam.lowerRadiusLimit=6;cam.upperRadiusLimit=12;cam.attachControl(canvas,true);cam.inputs.removeByType('ArcRotateCameraPointersInput');
+scene.onBeforeRenderObservable.add(update);return scene}
+function nearFence(){return Math.hypot(player.position.x-5.2,player.position.z-2.2)<5}
+function doWork(){if(repair>=5)return;if(!nearFence()){show('Get closer to the damaged fence');return}const f=fence[repair];f.rail.rotation.z=0;f.rail2.rotation.z=0;f.post.material=f.fixed;f.rail.material=f.fixed;f.rail2.material=f.fixed;repair++;document.getElementById('mission').textContent='Fence repaired: '+repair+' / 5';show(repair===5?'LEVEL COMPLETE — great work!':'Fence section repaired!')}
+function jump(){if(onGround){velY=.16;onGround=false}}
+function update(){const dt=Math.min(engine.getDeltaTime()/16.67,2),speed=.12*dt;let dx=0,dz=0;if(keys.left)dx-=speed;if(keys.right)dx+=speed;if(keys.forward)dz+=speed;if(keys.back)dz-=speed;player.position.x+=dx;player.position.z+=dz;if(dx||dz){player.rotation.y=Math.atan2(dx,dz);}
+velY-=.0085*dt;player.position.y+=velY*dt;if(player.position.y<=0){player.position.y=0;velY=0;onGround=true}cam.target=BABYLON.Vector3.Lerp(cam.target,new BABYLON.Vector3(player.position.x,1.5+player.position.y,player.position.z),.09)}
+let toastTimer;function show(t){const el=document.getElementById('toast');el.textContent=t;el.style.display='block';clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.style.display='none',1400)}
+function bindHold(id,key){const b=document.getElementById(id);['pointerdown','touchstart'].forEach(e=>b.addEventListener(e,x=>{x.preventDefault();keys[key]=true}));['pointerup','pointercancel','pointerleave','touchend'].forEach(e=>b.addEventListener(e,x=>{x.preventDefault();keys[key]=false}))}
+bindHold('left','left');bindHold('right','right');document.getElementById('work').addEventListener('pointerdown',e=>{e.preventDefault();doWork()});document.getElementById('jump').addEventListener('pointerdown',e=>{e.preventDefault();jump()});
+window.addEventListener('keydown',e=>{if(e.code==='ArrowLeft'||e.code==='KeyA')keys.left=true;if(e.code==='ArrowRight'||e.code==='KeyD')keys.right=true;if(e.code==='ArrowUp'||e.code==='KeyW')keys.forward=true;if(e.code==='ArrowDown'||e.code==='KeyS')keys.back=true;if(e.code==='Space')jump();if(e.code==='KeyE')doWork()});window.addEventListener('keyup',e=>{if(e.code==='ArrowLeft'||e.code==='KeyA')keys.left=false;if(e.code==='ArrowRight'||e.code==='KeyD')keys.right=false;if(e.code==='ArrowUp'||e.code==='KeyW')keys.forward=false;if(e.code==='ArrowDown'||e.code==='KeyS')keys.back=false});
+scene=createScene();engine.runRenderLoop(()=>scene.render());window.addEventListener('resize',()=>engine.resize());document.getElementById('play').addEventListener('click',()=>document.getElementById('start').style.display='none');
+})();
+</script>
+</body>
+</html>
