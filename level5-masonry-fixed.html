@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>Boe's Side Jobs — Level 5 Masonry</title>
+<style>
+html,body{margin:0;width:100%;height:100%;background:#15110d;overflow:hidden;font-family:monospace;touch-action:none;user-select:none;-webkit-user-select:none}
+:root{--appH:100vh;--controlsH:118px}
+body{height:var(--appH);display:flex;flex-direction:column;align-items:center}
+#wrap{width:min(100vw,430px);height:calc(var(--appH) - var(--controlsH));padding:4px 6px 0}
+canvas{width:100%;height:100%;object-fit:contain;image-rendering:pixelated;background:#111;border-radius:15px}
+#ui{width:min(100vw,430px);height:var(--controlsH);display:flex;justify-content:space-between;align-items:flex-start;gap:8px;padding:8px 10px calc(18px + env(safe-area-inset-bottom));background:#17130f;border-top:1px solid #3f352b;box-sizing:border-box}
+.group{display:flex;gap:8px;align-items:center}.btn{border:2px solid #2b2722;box-shadow:0 4px 0 #070605;background:#ddd;color:#111;font-weight:900;display:flex;align-items:center;justify-content:center;touch-action:none}
+.move{width:64px;height:62px;border-radius:15px;font-size:27px}.round{width:72px;height:72px;border-radius:50%;font-size:10px}.jump{background:#cfe4ff}.mason{background:#f0d9ba}
+</style>
+</head>
+<body>
+<div id="wrap"><canvas id="game" width="390" height="650"></canvas></div>
+<div id="ui">
+  <div class="group"><div id="left" class="btn move">◀</div><div id="right" class="btn move">▶</div></div>
+  <div class="group"><div id="work" class="btn round mason">MASON</div><div id="jump" class="btn round jump">JUMP<br>/ CLIMB</div></div>
+</div>
+<script>
+(()=>{
+const c=document.getElementById('game'),g=c.getContext('2d');g.imageSmoothingEnabled=false;
+const W=390,H=650;
+const R=(x,y,w,h,col)=>{g.fillStyle=col;g.fillRect(Math.round(x),Math.round(y),Math.round(w),Math.round(h))};
+const T=(s,x,y,z=12,col='#fff',a='left')=>{g.fillStyle=col;g.font='bold '+z+'px monospace';g.textAlign=a;g.fillText(s,x,y)};
+let left=0,right=0,jumpHold=0,tick=0,hp=4,cash=900,msg='CLIMB THE SCAFFOLD — COMPLETE 6 BRICK SECTIONS',mt=150,inv=0,camY=900,state='play';
+const p={x:55,y:1410,vx:0,vy:0,on:1,dir:1};
+const platforms=[1450,1240,1030,820,610,400,190];
+const ladders=[{x:82,top:1240,bot:1450},{x:278,top:1030,bot:1240},{x:105,top:820,bot:1030},{x:270,top:610,bot:820},{x:92,top:400,bot:610},{x:276,top:190,bot:400}];
+const jobs=[1240,1030,820,610,400,190].map((y,i)=>({x:i%2?278:58,y:y-70,n:0,done:0}));
+const osha=[{x:320,y:1412},{x:58,y:1208},{x:315,y:998},{x:72,y:788},{x:305,y:578}];
+function sy(y){return y-camY}
+function clearMove(){left=0;right=0}
+window.addEventListener('blur',clearMove);document.addEventListener('visibilitychange',()=>{if(document.hidden)clearMove()});
+window.addEventListener('pointerup',clearMove);window.addEventListener('pointercancel',clearMove);window.addEventListener('touchcancel',clearMove);
+function bind(el,dir){el.addEventListener('pointerdown',e=>{e.preventDefault();if(dir<0)left=1;else right=1});['pointerup','pointercancel','pointerleave'].forEach(ev=>el.addEventListener(ev,e=>{e.preventDefault();if(dir<0)left=0;else right=0}))}
+bind(document.getElementById('left'),-1);bind(document.getElementById('right'),1);
+document.getElementById('jump').addEventListener('pointerdown',e=>{e.preventDefault();jumpHold=1;if(p.on&&!nearLadder()){p.vy=-9.4;p.on=0}});
+document.getElementById('jump').addEventListener('pointerup',e=>{e.preventDefault();jumpHold=0});
+document.getElementById('work').addEventListener('pointerdown',e=>{e.preventDefault();mason()});
+function nearLadder(){return ladders.some(L=>Math.abs((p.x+15)-L.x)<32&&p.y+38>L.top-20&&p.y<L.bot+20)}
+function mason(){
+ if(state!=='play')return;
+ const j=jobs.find(j=>!j.done&&Math.abs((p.x+15)-(j.x+36))<78&&Math.abs((p.y+20)-(j.y+42))<72);
+ if(!j){msg='MOVE CLOSER TO AN UNFINISHED BRICK SECTION';mt=55;return}
+ j.n=Math.min(5,j.n+1);msg='LAYING BRICK '+j.n+'/5';mt=38;
+ if(j.n>=5){j.done=1;cash+=100;msg='WALL SECTION COMPLETE! +$100';mt=70;if(jobs.every(z=>z.done)){state='win';msg='MASONRY JOB COMPLETE!';mt=9999}}
+}
+function hit(){
+ if(inv||state!=='play')return;hp--;inv=90;msg='OSHA CAUGHT YOU ON THE SCAFFOLD!';mt=70;p.vy=-4;p.x=Math.max(30,p.x-45);
+ if(hp<=0){state='over';msg='GAME OVER — TAP MASON TO RETRY';mt=9999}
+}
+function update(){
+ tick++;if(mt>0)mt--;if(inv>0)inv--;
+ if(state!=='play')return;
+ const acc=p.on?.48:.28,max=4.2;
+ if(left){p.vx=Math.max(-max,p.vx-acc);p.dir=-1}
+ if(right){p.vx=Math.min(max,p.vx+acc);p.dir=1}
+ if(!left&&!right)p.vx*=p.on?.78:.94;
+ const L=ladders.find(L=>Math.abs((p.x+15)-L.x)<31&&p.y+38>L.top-20&&p.y<L.bot+20);
+ if(L&&jumpHold){p.vy=-3.15;p.x+=(L.x-(p.x+15))*.18;p.on=0}else p.vy+=.52;
+ const oldY=p.y;p.x+=p.vx;p.y+=p.vy;p.x=Math.max(22,Math.min(342,p.x));p.on=0;
+ for(const py of platforms){if(p.vy>=0&&oldY+38<=py+5&&p.y+38>=py){p.y=py-38;p.vy=0;p.on=1;break}}
+ if(p.y>1412){p.y=1412;p.vy=0;p.on=1} if(p.y<120)p.y=120;
+ camY=Math.max(0,Math.min(1030,p.y-390));
+ for(const a of osha){
+   const dy=p.y-a.y;
+   if(Math.abs(dy)>35){
+     let best=ladders[0];for(const z of ladders)if(Math.abs(a.x-z.x)<Math.abs(a.x-best.x))best=z;
+     if(Math.abs(a.x-best.x)>7)a.x+=Math.sign(best.x-a.x)*1.18;else a.y+=Math.sign(dy)*1.35;
+   } else a.x+=Math.sign(p.x-a.x)*1.4;
+   a.x=Math.max(26,Math.min(342,a.x));a.y=Math.max(150,Math.min(1412,a.y));
+   if(Math.abs((p.x+15)-a.x)<23&&Math.abs((p.y+18)-a.y)<34)hit();
+ }
+}
+function drawGuy(x,y,oshaGuy=false,scale=1){
+ const s=scale,step=(tick>>3)&1,leg=step?2:-2,yy=y;
+ R(x+(7+leg)*s,yy+30*s,7*s,6*s,'#242424');R(x+(18-leg)*s,yy+30*s,7*s,6*s,'#242424');
+ R(x+(7+leg)*s,yy+22*s,6*s,9*s,'#31465c');R(x+(18-leg)*s,yy+22*s,6*s,9*s,'#31465c');
+ R(x+6*s,yy+10*s,19*s,14*s,oshaGuy?'#f0c43e':'#e9e3d8');
+ R(x+3*s,yy+13*s,5*s,10*s,'#d09a73');R(x+24*s,yy+13*s,5*s,10*s,'#d09a73');
+ R(x+9*s,yy+1*s,12*s,10*s,'#d69d74');R(x+10*s,yy+4*s,5*s,4*s,'#111');R(x+17*s,yy+4*s,5*s,4*s,'#111');
+ if(oshaGuy){R(x+7*s,yy-4*s,18*s,5*s,'#e7e7e2');R(x+5*s,yy,22*s,4*s,'#fff');R(x+22*s,yy+2*s,8*s,3*s,'#fff');T('OSHA',x+16*s,yy+29*s,7,'#fff','center')}
+ else{R(x+7*s,yy-3*s,16*s,5*s,'#7d1f23');R(x+5*s,yy,20*s,5*s,'#b52d32');R(x+22*s,yy+2*s,8*s,3*s,'#b52d32')}
+}
+function draw(){
+ R(0,0,W,H,'#92b6d2');R(0,0,W,112,'#20262b');
+ T("BOE'S SIDE JOBS",15,27,17,'#ffd85b');T('LEVEL 5: HIGH-RISE MASONRY',15,49,10);
+ T('BRICK SECTIONS '+jobs.filter(j=>j.done).length+'/6',15,70,11,'#9cff90');T('HOLD JUMP AT LADDERS TO CLIMB',15,91,9,'#ffe568');
+ T('$'+cash,375,29,15,'#7bff6d','right');T('♥'.repeat(hp)+'♡'.repeat(4-hp),375,53,13,'#ff6262','right');
+ R(246,112,144,H-112,'#bba58a');
+ for(let y=124;y<H;y+=24){R(246,y,144,2,'#9a876f');for(let x=246+((y/24)%2?18:0);x<390;x+=38)R(x,y,2,24,'#a08d74')}
+ for(let wy=230;wy<1450;wy+=210){const y=sy(wy);if(y>120&&y<625){R(300,y-72,62,54,'#3b4a54');R(306,y-66,24,45,'#7ec0d7');R(334,y-66,22,45,'#78aec1')}}
+ for(const py of platforms){const y=sy(py);if(y<100||y>650)continue;R(18,y-9,350,9,'#b88345');R(18,y,350,6,'#664527');R(24,y-45,5,45,'#56636a');R(361,y-45,5,45,'#56636a');R(24,y-45,342,4,'#56636a');R(24,y-27,342,3,'#6b7478');R(24,y-8,342,4,'#d8922f');for(let x=32;x<360;x+=84){R(x,y-185,5,185,'#737d82');R(x+66,y-185,5,185,'#737d82');g.strokeStyle='#69747a';g.lineWidth=3;g.beginPath();g.moveTo(x,y-180);g.lineTo(x+70,y-8);g.moveTo(x+70,y-180);g.lineTo(x,y-8);g.stroke()}}
+ for(const L of ladders){const y1=sy(L.top),y2=sy(L.bot);if(y2<100||y1>650)continue;R(L.x-10,y1,4,y2-y1,'#d7a33d');R(L.x+10,y1,4,y2-y1,'#d7a33d');for(let y=y1+10;y<y2;y+=18)R(L.x-8,y,20,3,'#e0b553')}
+ for(const j of jobs){const y=sy(j.y);if(y<100||y>625)continue;R(j.x-4,y-4,82,62,j.done?'#87502f':'#6e655d');for(let row=0;row<5;row++){if(row>=j.n)continue;for(let col=0;col<4;col++){const off=row%2?8:0;R(j.x+off+col*18,y+45-row*10,16,8,'#a85432');R(j.x+off+col*18,y+52-row*10,16,2,'#d39b78')}}T(j.done?'BRICKED':'MASON '+j.n+'/5',j.x+36,y-9,8,j.done?'#9cff90':'#fff','center')}
+ let y=sy(1368);if(y>110&&y<640){for(let i=0;i<5;i++){R(26+i*22,y-18,18,18,'#a85432');R(27+i*22,y-20,16,3,'#d39b78')}R(148,y-28,48,24,'#4f5d63');R(156,y-34,31,9,'#707e84');R(151,y-6,10,10,'#222');R(183,y-6,10,10,'#222');T('MIX',172,y-13,7,'#fff','center');R(210,y-30,24,30,'#d7b73b');T('MORTAR',222,y-12,6,'#382d15','center')}
+ for(const a of osha){const y=sy(a.y)-31;if(y>-70&&y<620)drawGuy(a.x,y,true,1.3)}
+ drawGuy(p.x,sy(p.y),false,1.3);
+ if(mt){R(26,116,338,35,'rgba(0,0,0,.76)');T(msg,195,139,8,'#fff','center')}
+ if(state==='win'){R(42,228,306,190,'rgba(0,0,0,.82)');T('LEVEL COMPLETE!',195,286,22,'#9cff90','center');T('MASONRY FINISHED',195,326,12,'#ffe568','center');T('YOU BEAT OSHA TO THE TOP',195,353,9,'#fff','center')}
+ if(state==='over'){R(42,228,306,190,'rgba(0,0,0,.82)');T('GAME OVER',195,286,24,'#ff6a5e','center');T('TAP MASON TO RETRY',195,340,11,'#fff','center')}
+}
+document.getElementById('work').addEventListener('pointerdown',()=>{if(state==='over'){hp=4;state='play';p.x=55;p.y=1410;p.vx=p.vy=0;for(const j of jobs){j.n=0;j.done=0}msg='CLIMB THE SCAFFOLD — COMPLETE 6 BRICK SECTIONS';mt=120}});
+function loop(){update();draw();requestAnimationFrame(loop)}
+function syncViewport(){const h=Math.round(window.visualViewport?window.visualViewport.height:window.innerHeight);document.documentElement.style.setProperty('--appH',h+'px')}
+syncViewport();window.addEventListener('resize',syncViewport);if(window.visualViewport)window.visualViewport.addEventListener('resize',syncViewport);
+loop();
+})();
+</script>
+</body>
+</html>
